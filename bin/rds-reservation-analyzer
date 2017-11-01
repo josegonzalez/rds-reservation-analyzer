@@ -1,0 +1,187 @@
+#!/usr/bin/env python
+from __future__ import print_function
+import argh
+import bitmath
+import boto3
+import datetime
+import requests
+import sys
+import os
+
+from filecache import filecache
+from first import first
+from pprint import pprint
+from sparklines import sparklines
+from tabulate import tabulate
+
+
+@filecache(24 * 60 * 60)
+def rds_metadata():
+    url = 'http://www.ec2instances.info/rds/instances.json'
+    return requests.get(url).json()
+
+
+@filecache(24 * 60 * 60)
+def get_metric_datapoints(instance_identifier,
+                          metric_name,
+                          unit,
+                          days_to_check):
+    seconds_in_one_day = 86400  # used for granularity
+
+    now = datetime.datetime.now()
+    past = datetime.timedelta(days=days_to_check)
+
+    client = boto3.client('cloudwatch')
+    response = client.get_metric_statistics(
+        Namespace='AWS/RDS',
+        Dimensions=[
+            {
+                'Name': 'DBInstanceIdentifier',
+                'Value': instance_identifier,
+            },
+        ],
+        MetricName=metric_name,
+        StartTime=now - past,
+        EndTime=datetime.datetime.now(),
+        Period=seconds_in_one_day,
+        Statistics=[
+            'Average'
+        ],
+        Unit=unit
+    )
+    return [point['Average'] for point in response.get('Datapoints', [])]
+
+
+@filecache(24 * 60 * 60)
+def get_db_instances():
+    client = boto3.client('rds')
+    paginator = client.get_paginator('describe_db_instances')
+    page_iterator = paginator.paginate()
+
+    rds_instances = []
+    for page in page_iterator:
+        for rds_instance in page['DBInstances']:
+            resource = rds_instance['DBInstanceArn']
+            response = client.list_tags_for_resource(ResourceName=resource)
+            rds_instance['Tags'] = response['TagList']
+            rds_instances.append(rds_instance)
+    return rds_instances
+
+
+def check_cpu(rds_instance, threshold=25, days_to_check=90):
+    name = rds_instance['DBInstanceIdentifier']
+    client = boto3.client('cloudwatch')
+    datapoints = get_metric_datapoints(name,
+                                       'CPUUtilization',
+                                       'Percent',
+                                       days_to_check)
+    avg = float(sum(datapoints)) / len(datapoints)
+
+    datapoints.append(100)
+    reserve = False
+    if avg < threshold:
+        reserve = True
+
+    return [name, avg, reserve, first(sparklines(datapoints))]
+
+
+def check_disk(rds_instance, threshold=25, days_to_check=90):
+    name = rds_instance['DBInstanceIdentifier']
+    total_disk = bitmath.GiB(float(rds_instance['AllocatedStorage']))
+    client = boto3.client('cloudwatch')
+    datapoints = get_metric_datapoints(name,
+                                       'FreeStorageSpace',
+                                       'Bytes',
+                                       days_to_check)
+    datapoints = [100 - (bitmath.Byte(d) / total_disk) * 100 for d in datapoints]
+    avg = float(sum(datapoints)) / len(datapoints)
+
+    datapoints.append(100)
+    reserve = False
+    if avg < threshold:
+        reserve = True
+
+    return [name, avg, reserve, first(sparklines(datapoints))]
+
+
+def check_memory(rds_instance, threshold=25, days_to_check=90):
+    name = rds_instance['DBInstanceIdentifier']
+    total_memory = bitmath.GiB(float(rds_instance['meta']['memory']))
+    client = boto3.client('cloudwatch')
+    datapoints = get_metric_datapoints(name,
+                                       'FreeableMemory',
+                                       'Bytes',
+                                       days_to_check)
+    datapoints = [100 - (bitmath.Byte(d) / total_memory) * 100 for d in datapoints]
+    avg = float(sum(datapoints)) / len(datapoints)
+
+    datapoints.append(100)
+    reserve = False
+    if avg < threshold:
+        reserve = True
+
+    return [name, avg, reserve, first(sparklines(datapoints))]
+
+
+def get_associated_metadata(rds_instance, metadata):
+    engine_map = {
+        'mysql': 'mysql',
+        'postgres': 'postgresql',
+    }
+    for m in metadata:
+        # todo: verify there is pricing data for this region
+        # if m['region'] != rds_instance['AvailabilityZone'][:-1]:
+        #     continue
+
+        # todo: verify there is pricing data for this engine
+        # if m['databaseEngine'].lower() != engine_map[rds_instance['Engine']]:
+        #     continue
+
+        if m['instanceType'] != rds_instance['DBInstanceClass']:
+            continue
+        return m
+
+
+@argh.arg('-C', '--check', choices=['cpu', 'disk', 'memory'])
+@argh.arg('-N', '--tag-name')
+@argh.arg('-V', '--tag-value')
+@argh.arg('-T', '--threshold')
+@argh.arg('-D', '--days-to-check')
+@argh.arg('-S', '--sort-by', choices=['name', 'percentage', 'reserve'])
+def main(check='disk',
+         tag_name='environment',
+         tag_value='production',
+         threshold=25,
+         days_to_check=90,
+         sort_by='name'):
+    metrics = {
+        'cpu': check_cpu,
+        'disk': check_disk,
+        'memory': check_memory,
+    }
+
+    metadata = rds_metadata()
+
+    rds_instances = []
+    for rds_instance in get_db_instances():
+        rds_instance['meta'] = get_associated_metadata(rds_instance, metadata)
+
+        for tag in rds_instance['Tags']:
+            if tag['Key'] == tag_name and tag['Value'] == tag_value:
+                rds_instances.append(rds_instance)
+
+    table = []
+    for rds_instance in rds_instances:
+        table.append(metrics[check](rds_instance, threshold, days_to_check))
+
+    if sort_by == 'percentage':
+        table.sort(key=lambda x: x[1])
+    if sort_by == 'reserve':
+        table.sort(key=lambda x: x[2])
+
+    headers = ['instance identifier', 'percentage', 'reserve', 'sparklines']
+    print(tabulate(table, headers=headers))
+
+
+if __name__ == '__main__':
+    argh.dispatch_command(main)
