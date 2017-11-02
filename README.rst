@@ -50,6 +50,13 @@ Just execute the binary with the correct arguments::
     # remove sparklines from output
     bin/rds-reservation-analyzer --check cpu --no-sparklines
 
+    # override the reservation type (default: 1yr-no-upfront)
+    bin/rds-reservation-analyzer --check cpu --reservation-type 1yr-no-upfront
+    bin/rds-reservation-analyzer --check cpu --reservation-type 1yr-partial-upfront
+    bin/rds-reservation-analyzer --check cpu --reservation-type 1yr-all-upfront
+    bin/rds-reservation-analyzer --check cpu --reservation-type 3yr-partial-upfront
+    bin/rds-reservation-analyzer --check cpu --reservation-type 3yr-all-upfront
+
 Credits
 =======
 
