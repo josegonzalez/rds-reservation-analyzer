@@ -47,6 +47,9 @@ Just execute the binary with the correct arguments::
     # override the default sort (name) (options: name, percentage, reserve)
     bin/rds-reservation-analyzer --check cpu --sort-by percentage
 
+    # remove sparklines from output
+    bin/rds-reservation-analyzer --check cpu --no-sparklines
+
 Credits
 =======
 

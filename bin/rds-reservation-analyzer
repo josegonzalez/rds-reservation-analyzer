@@ -151,9 +151,11 @@ def get_associated_metadata(rds_instance, metadata):
 @argh.arg('-V', '--tag-value')
 @argh.arg('-T', '--threshold')
 @argh.arg('-D', '--days-to-check')
+@argh.arg('-N', '--no-sparklines')
 @argh.arg('-S', '--sort-by', choices=['name', 'percentage', 'reserve'])
 def main(check='disk',
          tag_name='environment',
+         no_sparklines=False,
          tag_value='production',
          threshold=25,
          days_to_check=90,
@@ -176,14 +178,19 @@ def main(check='disk',
 
     table = []
     for rds_instance in rds_instances:
-        table.append(metrics[check](rds_instance, threshold, days_to_check))
+        metrics = metric_funcs[check](rds_instance, reservation_type, threshold, days_to_check)
+        if no_sparklines:
+            del metrics[-1]
+        table.append(metrics)
 
     if sort_by == 'percentage':
         table.sort(key=lambda x: x[1])
     if sort_by == 'reserve':
         table.sort(key=lambda x: x[2])
 
-    headers = ['instance identifier', 'percentage', 'reserve', 'sparklines']
+    headers = ['instance identifier', 'instance type', 'percentage', 'reserve', 'sparklines']
+    if no_sparklines:
+        del headers[-1]
     print(tabulate(table, headers=headers))
 
 
