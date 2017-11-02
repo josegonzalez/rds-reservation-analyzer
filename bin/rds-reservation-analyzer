@@ -358,7 +358,8 @@ def main(check='disk',
     headers = [
         'instance identifier',
         'instance type',
-        'percentage',
+        'cost',
+        'resource usage %',
         'reserve',
         'sparklines'
     ]
