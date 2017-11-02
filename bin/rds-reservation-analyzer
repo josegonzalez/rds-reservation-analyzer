@@ -124,19 +124,22 @@ def check_memory(rds_instance, threshold=25, days_to_check=90):
 
 
 def get_associated_metadata(rds_instance, metadata):
-    region = rds_instance['AvailabilityZone'][:-1]
     engine_map = {
-        'mysql': 'mysql',
-        'postgres': 'postgresql',
+        'mariadb': 'MariaDB',
+        'mysql': 'MySQL',
+        'postgres': 'PostgreSQL',
     }
 
+    region = rds_instance['AvailabilityZone'][:-1]
+    database_engine = engine_map[rds_instance['Engine']]
+
     for m in metadata:
-        if m['pricing'].get(region, None) is None:
+        region_pricing = m['pricing'].get(region, None)
+        if region_pricing is None:
             continue
 
-        # todo: verify there is pricing data for this engine
-        # if m['databaseEngine'].lower() != engine_map[rds_instance['Engine']]:
-        #     continue
+        if region_pricing.get(database_engine, None) is None:
+            continue
 
         if m['instanceType'] != rds_instance['DBInstanceClass']:
             continue
