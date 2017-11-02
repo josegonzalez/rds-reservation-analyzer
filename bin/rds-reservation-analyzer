@@ -23,7 +23,7 @@ def rds_metadata():
 
 @filecache(24 * 60 * 60)
 def rds_offers(region):
-    url = 'https://pricing.{0}.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/index.json'.format(region)
+    url = 'https://pricing.{0}.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/index.json'.format(region)  # noqa
     return requests.get(url).json()
 
 
@@ -75,7 +75,11 @@ def get_db_instances():
 
 
 @filecache(24 * 60 * 60)
-def get_associated_offer(instance_identifier, instance_type, engine, region, is_multi_az):
+def get_associated_offer(instance_identifier,
+                         instance_type,
+                         engine,
+                         region,
+                         is_multi_az):
     engine_map = {
         'mariadb': 'MariaDB',
         'mysql': 'MySQL',
@@ -105,10 +109,15 @@ def get_associated_offer(instance_identifier, instance_type, engine, region, is_
     offers = rds_offers(region)
     potential_products = []
     for sku, product in offers.get('products', {}).items():
-        product_location = product['attributes'].get('location', None)
-        product_instance_type = product['attributes'].get('instanceType', None)
-        product_database_engine = product['attributes'].get('databaseEngine', None)
-        product_deployment_option = product['attributes'].get('deploymentOption', 'Single-AZ')
+        attributes = product['attributes']
+        product_location = attributes.get('location',
+                                          None)
+        product_instance_type = attributes.get('instanceType',
+                                               None)
+        product_database_engine = attributes.get('databaseEngine',
+                                                 None)
+        product_deployment_option = attributes.get('deploymentOption',
+                                                   'Single-AZ')
 
         if product_location is None:
             continue
@@ -133,12 +142,14 @@ def get_associated_offer(instance_identifier, instance_type, engine, region, is_
 
     if len(potential_products) != 1:
         print('Error getting product for {0}'.format(instance_identifier))
-        print('Number of potential matching products: {0}'.format(len(potential_products)))
+        print('Number of potential matching products: {0}'.format(
+            len(potential_products)))
         pprint(potential_products)
         sys.exit(1)
 
     product = potential_products[0]
-    terms = offers.get('terms', {}).get('Reserved', {}).get(product['sku'], None)
+    reserved_data = offers.get('terms', {}).get('Reserved', {})
+    terms = reserved_data.get(product['sku'], None)
     if terms is None:
         print('Error getting terms for product')
         sys.exit(1)
@@ -155,18 +166,22 @@ def calculate_offerings(offer_terms):
         description = '{0}-{1}'.format(length, description)
         per_year_costs = 0.00
         for pd_sku, price_dimension in offer_term['priceDimensions'].items():
+            price = price_dimension['pricePerUnit']['USD']
             if price_dimension['description'] == 'Upfront Fee':
                 if length == '3yr':
-                    per_year_costs += float(price_dimension['pricePerUnit']['USD']) / 3
+                    per_year_costs += float(price) / 3
                 else:
-                    per_year_costs += float(price_dimension['pricePerUnit']['USD'])
+                    per_year_costs += float(price)
             else:
-                per_year_costs += float(price_dimension['pricePerUnit']['USD']) * hours_per_year
+                per_year_costs += float(price) * hours_per_year
         offerings[description.lower().replace(' ', '-')] = per_year_costs
     return offerings
 
 
-def check_cpu(rds_instance, reservation_type, threshold=25, days_to_check=90):
+def check_cpu(rds_instance,
+              reservation_type,
+              threshold=25,
+              days_to_check=90):
     name = rds_instance['DBInstanceIdentifier']
     client = boto3.client('cloudwatch')
     datapoints = get_metric_datapoints(name,
@@ -183,10 +198,20 @@ def check_cpu(rds_instance, reservation_type, threshold=25, days_to_check=90):
     offerings = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
 
-    return [name, rds_instance['DBInstanceClass'], cost, avg, reserve, first(sparklines(datapoints))]
+    return [
+        name,
+        rds_instance['DBInstanceClass'],
+        cost,
+        avg,
+        reserve,
+        first(sparklines(datapoints))
+    ]
 
 
-def check_disk(rds_instance, reservation_type, threshold=25, days_to_check=90):
+def check_disk(rds_instance,
+               reservation_type,
+               threshold=25,
+               days_to_check=90):
     name = rds_instance['DBInstanceIdentifier']
     total_disk = bitmath.GiB(float(rds_instance['AllocatedStorage']))
     client = boto3.client('cloudwatch')
@@ -194,7 +219,7 @@ def check_disk(rds_instance, reservation_type, threshold=25, days_to_check=90):
                                        'FreeStorageSpace',
                                        'Bytes',
                                        days_to_check)
-    datapoints = [100 - (bitmath.Byte(d) / total_disk) * 100 for d in datapoints]
+    datapoints = [100 - (bitmath.Byte(d) / total_disk) * 100 for d in datapoints]  # noqa
     avg = float(sum(datapoints)) / len(datapoints)
 
     datapoints.append(100)
@@ -205,10 +230,20 @@ def check_disk(rds_instance, reservation_type, threshold=25, days_to_check=90):
     offerings = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
 
-    return [name, rds_instance['DBInstanceClass'], cost, avg, reserve, first(sparklines(datapoints))]
+    return [
+        name,
+        rds_instance['DBInstanceClass'],
+        cost,
+        avg,
+        reserve,
+        first(sparklines(datapoints))
+    ]
 
 
-def check_memory(rds_instance, reservation_type, threshold=25, days_to_check=90):
+def check_memory(rds_instance,
+                 reservation_type,
+                 threshold=25,
+                 days_to_check=90):
     name = rds_instance['DBInstanceIdentifier']
     total_memory = bitmath.GiB(float(rds_instance['meta']['memory']))
     client = boto3.client('cloudwatch')
@@ -216,7 +251,7 @@ def check_memory(rds_instance, reservation_type, threshold=25, days_to_check=90)
                                        'FreeableMemory',
                                        'Bytes',
                                        days_to_check)
-    datapoints = [100 - (bitmath.Byte(d) / total_memory) * 100 for d in datapoints]
+    datapoints = [100 - (bitmath.Byte(d) / total_memory) * 100 for d in datapoints]  # noqa
     avg = float(sum(datapoints)) / len(datapoints)
 
     datapoints.append(100)
@@ -227,7 +262,14 @@ def check_memory(rds_instance, reservation_type, threshold=25, days_to_check=90)
     offerings = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
 
-    return [name, rds_instance['DBInstanceClass'], cost, avg, reserve, first(sparklines(datapoints))]
+    return [
+        name,
+        rds_instance['DBInstanceClass'],
+        cost,
+        avg,
+        reserve,
+        first(sparklines(datapoints))
+    ]
 
 
 def get_associated_metadata(rds_instance, metadata):
@@ -259,7 +301,7 @@ def get_associated_metadata(rds_instance, metadata):
 @argh.arg('-D', '--days-to-check')
 @argh.arg('-N', '--no-sparklines')
 @argh.arg('-S', '--sort-by', choices=['name', 'percentage', 'reserve'])
-@argh.arg('-R', '--reservation-type', choices=['1yr-no-upfront', '1yr-partial-upfront', '1yr-all-upfront', '3yr-partial-upfront', '3yr-all-upfront'])
+@argh.arg('-R', '--reservation-type', choices=['1yr-no-upfront', '1yr-partial-upfront', '1yr-all-upfront', '3yr-partial-upfront', '3yr-all-upfront'])  # noqa
 def main(check='disk',
          no_sparklines=False,
          tag_key='environment',
@@ -284,7 +326,11 @@ def main(check='disk',
         region = rds_instance['AvailabilityZone'][:-1]
         is_multi_az = rds_instance.get('MultiAZ', False)
 
-        product, terms = get_associated_offer(instance_identifier, instance_type, engine, region, is_multi_az)
+        product, terms = get_associated_offer(instance_identifier,
+                                              instance_type,
+                                              engine,
+                                              region,
+                                              is_multi_az)
         rds_instance['offer_product'] = product
         rds_instance['offer_terms'] = terms
         rds_instance['region'] = rds_instance['AvailabilityZone'][:-1]
@@ -296,7 +342,10 @@ def main(check='disk',
 
     table = []
     for rds_instance in rds_instances:
-        metrics = metric_funcs[check](rds_instance, reservation_type, threshold, days_to_check)
+        metrics = metric_funcs[check](rds_instance,
+                                      reservation_type,
+                                      threshold,
+                                      days_to_check)
         if no_sparklines:
             del metrics[-1]
         table.append(metrics)
@@ -306,7 +355,13 @@ def main(check='disk',
     if sort_by == 'reserve':
         table.sort(key=lambda x: x[2])
 
-    headers = ['instance identifier', 'instance type', 'percentage', 'reserve', 'sparklines']
+    headers = [
+        'instance identifier',
+        'instance type',
+        'percentage',
+        'reserve',
+        'sparklines'
+    ]
     if no_sparklines:
         del headers[-1]
     print(tabulate(table, headers=headers))
