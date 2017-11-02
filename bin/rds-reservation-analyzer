@@ -147,15 +147,15 @@ def get_associated_metadata(rds_instance, metadata):
 
 
 @argh.arg('-C', '--check', choices=['cpu', 'disk', 'memory'])
-@argh.arg('-N', '--tag-name')
+@argh.arg('-K', '--tag-key')
 @argh.arg('-V', '--tag-value')
 @argh.arg('-T', '--threshold')
 @argh.arg('-D', '--days-to-check')
 @argh.arg('-N', '--no-sparklines')
 @argh.arg('-S', '--sort-by', choices=['name', 'percentage', 'reserve'])
 def main(check='disk',
-         tag_name='environment',
          no_sparklines=False,
+         tag_key='environment',
          tag_value='production',
          threshold=25,
          days_to_check=90,
@@ -173,7 +173,7 @@ def main(check='disk',
         rds_instance['meta'] = get_associated_metadata(rds_instance, metadata)
 
         for tag in rds_instance['Tags']:
-            if tag['Key'] == tag_name and tag['Value'] == tag_value:
+            if tag['Key'] == tag_key and tag['Value'] == tag_value:
                 rds_instances.append(rds_instance)
 
     table = []
