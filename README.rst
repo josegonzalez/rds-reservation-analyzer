@@ -35,16 +35,16 @@ Just execute the binary with the correct arguments::
     bin/rds-reservation-analyzer --check disk
     bin/rds-reservation-analyzer --check memory
 
-    # override the default threshold percentage (25)
+    # override the default threshold percentage (default: 25)
     bin/rds-reservation-analyzer --check cpu --threshold 50
 
-    # override the default days to check average over (90)
+    # override the default days to check average over (default: 90)
     bin/rds-reservation-analyzer --check cpu --days-to-check 90
 
-    # override the default tag key/value (environment:production)
+    # override the default tag key/value (default: environment:production)
     bin/rds-reservation-analyzer --check cpu --tag-name environment --tag-value production
 
-    # override the default sort (name) (options: name, percentage, reserve)
+    # override the default sort (default: name) (options: name, percentage, reserve)
     bin/rds-reservation-analyzer --check cpu --sort-by percentage
 
     # remove sparklines from output
