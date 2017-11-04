@@ -197,11 +197,13 @@ def check_cpu(rds_instance,
 
     offerings = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
+    savings = offerings['1yr-no-upfront'] - offerings[reservation_type]
 
     return [
         name,
         rds_instance['DBInstanceClass'],
         cost,
+        str(round(savings, 2)),
         avg,
         reserve,
         first(sparklines(datapoints))
@@ -229,11 +231,13 @@ def check_disk(rds_instance,
 
     offerings = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
+    savings = offerings['1yr-no-upfront'] - offerings[reservation_type]
 
     return [
         name,
         rds_instance['DBInstanceClass'],
         cost,
+        str(round(savings, 2)),
         avg,
         reserve,
         first(sparklines(datapoints))
@@ -261,11 +265,13 @@ def check_memory(rds_instance,
 
     offerings = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
+    savings = offerings['1yr-no-upfront'] - offerings[reservation_type]
 
     return [
         name,
         rds_instance['DBInstanceClass'],
         cost,
+        str(round(savings, 2)),
         avg,
         reserve,
         first(sparklines(datapoints))
@@ -359,6 +365,7 @@ def main(check='disk',
         'instance identifier',
         'instance type',
         'cost',
+        'savings',
         'resource usage %',
         'reserve',
         'sparklines'
