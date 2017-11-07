@@ -44,11 +44,12 @@ Just execute the binary with the correct arguments::
     # override the default tag key/value (default: environment:production)
     bin/rds-reservation-analyzer --check cpu --tag-name environment --tag-value production
 
-    # override the default sort (default: name) (options: name, percentage, reserve)
-    bin/rds-reservation-analyzer --check cpu --sort-by percentage
-
-    # remove sparklines from output
-    bin/rds-reservation-analyzer --check cpu --no-sparklines
+    # override the default sort (default: id) (options: id, type, cost, savings, resource_usage, reserve)
+    bin/rds-reservation-analyzer --check cpu --sort-by type
+    bin/rds-reservation-analyzer --check cpu --sort-by cost
+    bin/rds-reservation-analyzer --check cpu --sort-by savings
+    bin/rds-reservation-analyzer --check cpu --sort-by resource_usage
+    bin/rds-reservation-analyzer --check cpu --sort-by reserve
 
     # override the reservation type (default: 1yr-no-upfront)
     bin/rds-reservation-analyzer --check cpu --reservation-type all
@@ -59,7 +60,11 @@ Just execute the binary with the correct arguments::
     bin/rds-reservation-analyzer --check cpu --reservation-type 3yr-all-upfront
 
     # override the output format (default: stdout)
+    # xls will output to a reservations.xls file
     bin/rds-reservation-analyzer --check cpu --format xls
+
+    # override the output fields shown (default: id,type,cost,savings,resource_usage,reserve,sparklines)
+    bin/rds-reservation-analyzer --check cpu --fields id,cost,savings,resource_usage
 
 Credits
 =======

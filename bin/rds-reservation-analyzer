@@ -3,6 +3,7 @@ from __future__ import print_function
 import argh
 import bitmath
 import boto3
+import collections
 import datetime
 import requests
 import sys
@@ -198,17 +199,17 @@ def check_cpu(rds_instance,
 
     offerings = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
-    savings = offerings['1yr-no-upfront'] - offerings[reservation_type]
+    savings = offerings['1yr-no-upfront'] - cost
 
-    return [
-        name,
-        rds_instance['DBInstanceClass'],
-        cost,
-        str(round(savings, 2)),
-        avg,
-        reserve,
-        first(sparklines(datapoints))
-    ]
+    return collections.OrderedDict([
+        ('id', name),
+        ('type', rds_instance['DBInstanceClass']),
+        ('cost', cost),
+        ('savings', str(round(savings, 2))),
+        ('resource_usage', avg),
+        ('reserve', reserve),
+        ('sparklines', first(sparklines(datapoints))),
+    ])
 
 
 def check_disk(rds_instance,
@@ -233,17 +234,17 @@ def check_disk(rds_instance,
 
     offerings = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
-    savings = offerings['1yr-no-upfront'] - offerings[reservation_type]
+    savings = offerings['1yr-no-upfront'] - cost
 
-    return [
-        name,
-        rds_instance['DBInstanceClass'],
-        cost,
-        str(round(savings, 2)),
-        avg,
-        reserve,
-        first(sparklines(datapoints))
-    ]
+    return collections.OrderedDict([
+        ('id', name),
+        ('type', rds_instance['DBInstanceClass']),
+        ('cost', cost),
+        ('savings', str(round(savings, 2))),
+        ('resource_usage', avg),
+        ('reserve', reserve),
+        ('sparklines', first(sparklines(datapoints))),
+    ])
 
 
 def check_memory(rds_instance,
@@ -268,17 +269,17 @@ def check_memory(rds_instance,
 
     offerings = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
-    savings = offerings['1yr-no-upfront'] - offerings[reservation_type]
+    savings = offerings['1yr-no-upfront'] - cost
 
-    return [
-        name,
-        rds_instance['DBInstanceClass'],
-        cost,
-        str(round(savings, 2)),
-        avg,
-        reserve,
-        first(sparklines(datapoints))
-    ]
+    return collections.OrderedDict([
+        ('id', name),
+        ('type', rds_instance['DBInstanceClass']),
+        ('cost', cost),
+        ('savings', str(round(savings, 2))),
+        ('resource_usage', avg),
+        ('reserve', reserve),
+        ('sparklines', first(sparklines(datapoints))),
+    ])
 
 
 def get_associated_metadata(rds_instance, metadata):
@@ -322,7 +323,7 @@ def output_to_xls(tables, headers):
 def compute_table(rds_instances,
                   check,
                   days_to_check,
-                  no_sparklines,
+                  fields,
                   reservation_type,
                   sort_by,
                   threshold):
@@ -332,38 +333,41 @@ def compute_table(rds_instances,
         'memory': check_memory,
     }
 
-    table = []
+    metrics = []
     for rds_instance in rds_instances:
-        metrics = metric_funcs[check](rds_instance,
-                                      reservation_type,
-                                      threshold,
-                                      days_to_check)
-        if no_sparklines:
-            del metrics[-1]
-        table.append(metrics)
+        metrics.append(metric_funcs[check](rds_instance,
+                                           reservation_type,
+                                           threshold,
+                                           days_to_check))
 
-    if sort_by == 'percentage':
-        table.sort(key=lambda x: x[1])
-    if sort_by == 'reserve':
-        table.sort(key=lambda x: x[2])
+    metrics.sort(key=lambda x: x[sort_by])
+
+    table = []
+    for metric in metrics:
+        row = []
+        for key, value in metric.items():
+            if key in fields:
+                row.append(value)
+        table.append(row)
+
     return table
 
 
 @argh.arg('-C', '--check', choices=['cpu', 'disk', 'memory'])
 @argh.arg('-D', '--days-to-check')
+@argh.arg('-f', '--fields')
 @argh.arg('-F', '--format', choices=['stdout', 'xls'])
 @argh.arg('-K', '--tag-key')
-@argh.arg('-N', '--no-sparklines')
 @argh.arg('-R', '--reservation-type', choices=['1yr-no-upfront', '1yr-partial-upfront', '1yr-all-upfront', '3yr-partial-upfront', '3yr-all-upfront', 'all'])  # noqa
-@argh.arg('-S', '--sort-by', choices=['name', 'percentage', 'reserve'])
+@argh.arg('-S', '--sort-by', choices=['id', 'type', 'cost', 'savings', 'resource_usage', 'reserve'])  # noqa
 @argh.arg('-T', '--threshold')
 @argh.arg('-V', '--tag-value')
 def main(check='disk',
          days_to_check=90,
+         fields='id,type,cost,savings,resource_usage,reserve,sparklines',
          format='stdout',
-         no_sparklines=False,
          reservation_type='1yr-no-upfront',
-         sort_by='name',
+         sort_by='id',
          tag_key='environment',
          tag_value='production',
          threshold=25):
@@ -404,27 +408,31 @@ def main(check='disk',
     else:
         reservation_types = [reservation_type]
 
+    fields = fields.split(',')
     for reservation_type in reservation_types:
         tables[reservation_type] = compute_table(
             rds_instances,
             check,
             days_to_check,
-            no_sparklines,
+            fields,
             reservation_type,
             sort_by,
             threshold)
 
-    headers = [
-        'instance identifier',
-        'instance type',
-        'cost',
-        'savings',
-        'resource usage %',
-        'reserve',
-        'sparklines'
-    ]
-    if no_sparklines:
-        del headers[-1]
+    fields_map = collections.OrderedDict([
+      ('id', 'instance identifier'),
+      ('type', 'instance type'),
+      ('cost', 'cost'),
+      ('savings', 'savings'),
+      ('resource_usage', 'resource usage %'),
+      ('reserve', 'reserve'),
+      ('sparklines', 'sparklines'),
+    ])
+
+    for field, header in fields_map.items():
+        if field not in fields:
+            del fields_map[field]
+    headers = fields_map.values()
 
     if format == 'stdout':
         for reservation_type, table in tables.items():
