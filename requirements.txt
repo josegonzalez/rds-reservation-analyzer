@@ -7,3 +7,4 @@ future
 requests
 sparklines
 tabulate
+xlwt

@@ -51,11 +51,15 @@ Just execute the binary with the correct arguments::
     bin/rds-reservation-analyzer --check cpu --no-sparklines
 
     # override the reservation type (default: 1yr-no-upfront)
+    bin/rds-reservation-analyzer --check cpu --reservation-type all
     bin/rds-reservation-analyzer --check cpu --reservation-type 1yr-no-upfront
     bin/rds-reservation-analyzer --check cpu --reservation-type 1yr-partial-upfront
     bin/rds-reservation-analyzer --check cpu --reservation-type 1yr-all-upfront
     bin/rds-reservation-analyzer --check cpu --reservation-type 3yr-partial-upfront
     bin/rds-reservation-analyzer --check cpu --reservation-type 3yr-all-upfront
+
+    # override the output format (default: stdout)
+    bin/rds-reservation-analyzer --check cpu --format xls
 
 Credits
 =======

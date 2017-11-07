@@ -6,6 +6,7 @@ import boto3
 import datetime
 import requests
 import sys
+import xlwt
 
 from filecache import filecache
 from first import first
@@ -302,6 +303,22 @@ def get_associated_metadata(rds_instance, metadata):
         return m
 
 
+def output_to_xls(tables, headers):
+    book = xlwt.Workbook(encoding="utf-8")
+
+    for reservation_type, table in tables.items():
+        sheet = book.add_sheet(reservation_type)
+
+        for column, header in enumerate(headers):
+            sheet.write(0, column, header)
+
+        for row, values in enumerate(table):
+            for column, value in enumerate(values):
+                sheet.write(row + 1, column, value)
+
+    book.save("reservations.xls")
+
+
 def compute_table(rds_instances,
                   check,
                   days_to_check,
@@ -334,6 +351,7 @@ def compute_table(rds_instances,
 
 @argh.arg('-C', '--check', choices=['cpu', 'disk', 'memory'])
 @argh.arg('-D', '--days-to-check')
+@argh.arg('-F', '--format', choices=['stdout', 'xls'])
 @argh.arg('-K', '--tag-key')
 @argh.arg('-N', '--no-sparklines')
 @argh.arg('-R', '--reservation-type', choices=['1yr-no-upfront', '1yr-partial-upfront', '1yr-all-upfront', '3yr-partial-upfront', '3yr-all-upfront', 'all'])  # noqa
@@ -342,6 +360,7 @@ def compute_table(rds_instances,
 @argh.arg('-V', '--tag-value')
 def main(check='disk',
          days_to_check=90,
+         format='stdout',
          no_sparklines=False,
          reservation_type='1yr-no-upfront',
          sort_by='name',
@@ -407,14 +426,17 @@ def main(check='disk',
     if no_sparklines:
         del headers[-1]
 
-    for reservation_type, table in tables.items():
-        header = "reservation type: {0}".format(reservation_type)
+    if format == 'stdout':
+        for reservation_type, table in tables.items():
+            header = "reservation type: {0}".format(reservation_type)
 
-        print("=" * len(header))
-        print(header)
-        print("=" * len(header))
+            print("=" * len(header))
+            print(header)
+            print("=" * len(header))
 
-        print(tabulate(table, headers=headers))
+            print(tabulate(table, headers=headers))
+    elif format == 'xls':
+        output_to_xls(tables, headers=headers)
 
 
 if __name__ == '__main__':
