@@ -6,7 +6,6 @@ import boto3
 import datetime
 import requests
 import sys
-import os
 
 from filecache import filecache
 from first import first
@@ -303,27 +302,52 @@ def get_associated_metadata(rds_instance, metadata):
         return m
 
 
-@argh.arg('-C', '--check', choices=['cpu', 'disk', 'memory'])
-@argh.arg('-K', '--tag-key')
-@argh.arg('-V', '--tag-value')
-@argh.arg('-T', '--threshold')
-@argh.arg('-D', '--days-to-check')
-@argh.arg('-N', '--no-sparklines')
-@argh.arg('-S', '--sort-by', choices=['name', 'percentage', 'reserve'])
-@argh.arg('-R', '--reservation-type', choices=['1yr-no-upfront', '1yr-partial-upfront', '1yr-all-upfront', '3yr-partial-upfront', '3yr-all-upfront'])  # noqa
-def main(check='disk',
-         no_sparklines=False,
-         tag_key='environment',
-         tag_value='production',
-         threshold=25,
-         days_to_check=90,
-         sort_by='name',
-         reservation_type='1yr-no-upfront'):
+def compute_table(rds_instances,
+                  check,
+                  days_to_check,
+                  no_sparklines,
+                  reservation_type,
+                  sort_by,
+                  threshold):
     metric_funcs = {
         'cpu': check_cpu,
         'disk': check_disk,
         'memory': check_memory,
     }
+
+    table = []
+    for rds_instance in rds_instances:
+        metrics = metric_funcs[check](rds_instance,
+                                      reservation_type,
+                                      threshold,
+                                      days_to_check)
+        if no_sparklines:
+            del metrics[-1]
+        table.append(metrics)
+
+    if sort_by == 'percentage':
+        table.sort(key=lambda x: x[1])
+    if sort_by == 'reserve':
+        table.sort(key=lambda x: x[2])
+    return table
+
+
+@argh.arg('-C', '--check', choices=['cpu', 'disk', 'memory'])
+@argh.arg('-D', '--days-to-check')
+@argh.arg('-K', '--tag-key')
+@argh.arg('-N', '--no-sparklines')
+@argh.arg('-R', '--reservation-type', choices=['1yr-no-upfront', '1yr-partial-upfront', '1yr-all-upfront', '3yr-partial-upfront', '3yr-all-upfront', 'all'])  # noqa
+@argh.arg('-S', '--sort-by', choices=['name', 'percentage', 'reserve'])
+@argh.arg('-T', '--threshold')
+@argh.arg('-V', '--tag-value')
+def main(check='disk',
+         days_to_check=90,
+         no_sparklines=False,
+         reservation_type='1yr-no-upfront',
+         sort_by='name',
+         tag_key='environment',
+         tag_value='production',
+         threshold=25):
 
     metadata = rds_metadata()
 
@@ -349,20 +373,27 @@ def main(check='disk',
             if tag['Key'] == tag_key and tag['Value'] == tag_value:
                 rds_instances.append(rds_instance)
 
-    table = []
-    for rds_instance in rds_instances:
-        metrics = metric_funcs[check](rds_instance,
-                                      reservation_type,
-                                      threshold,
-                                      days_to_check)
-        if no_sparklines:
-            del metrics[-1]
-        table.append(metrics)
+    tables = {}
+    if reservation_type == 'all':
+        reservation_types = [
+            '1yr-no-upfront',
+            '1yr-partial-upfront',
+            '1yr-all-upfront',
+            '3yr-partial-upfront',
+            '3yr-all-upfront'
+        ]
+    else:
+        reservation_types = [reservation_type]
 
-    if sort_by == 'percentage':
-        table.sort(key=lambda x: x[1])
-    if sort_by == 'reserve':
-        table.sort(key=lambda x: x[2])
+    for reservation_type in reservation_types:
+        tables[reservation_type] = compute_table(
+            rds_instances,
+            check,
+            days_to_check,
+            no_sparklines,
+            reservation_type,
+            sort_by,
+            threshold)
 
     headers = [
         'instance identifier',
@@ -375,7 +406,9 @@ def main(check='disk',
     ]
     if no_sparklines:
         del headers[-1]
-    print(tabulate(table, headers=headers))
+
+    for reservation_type, table in tables.items():
+        print(tabulate(table, headers=headers))
 
 
 if __name__ == '__main__':
