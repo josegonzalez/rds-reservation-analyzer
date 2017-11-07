@@ -42,7 +42,10 @@ Just execute the binary with the correct arguments::
     bin/rds-reservation-analyzer --check cpu --days-to-check 90
 
     # override the default tag key/value (default: environment:production)
-    bin/rds-reservation-analyzer --check cpu --tag-name environment --tag-value production
+    bin/rds-reservation-analyzer --check cpu --tag-key environment --tag-value production
+
+    # disable tag filtering
+    bin/rds-reservation-analyzer --check cpu --tag-key none
 
     # override the default sort (default: id) (options: id, type, cost, savings, resource_usage, reserve)
     bin/rds-reservation-analyzer --check cpu --sort-by type

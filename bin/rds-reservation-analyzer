@@ -392,9 +392,12 @@ def main(check='disk',
         rds_instance['region'] = rds_instance['AvailabilityZone'][:-1]
         rds_instance['meta'] = get_associated_metadata(rds_instance, metadata)
 
-        for tag in rds_instance['Tags']:
-            if tag['Key'] == tag_key and tag['Value'] == tag_value:
-                rds_instances.append(rds_instance)
+        if tag_key == 'none':
+            rds_instances.append(rds_instance)
+        else:
+            for tag in rds_instance['Tags']:
+                if tag['Key'] == tag_key and tag['Value'] == tag_value:
+                    rds_instances.append(rds_instance)
 
     tables = {}
     if reservation_type == 'all':
