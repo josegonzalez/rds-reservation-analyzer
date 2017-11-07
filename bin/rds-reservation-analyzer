@@ -408,6 +408,12 @@ def main(check='disk',
         del headers[-1]
 
     for reservation_type, table in tables.items():
+        header = "reservation type: {0}".format(reservation_type)
+
+        print("=" * len(header))
+        print(header)
+        print("=" * len(header))
+
         print(tabulate(table, headers=headers))
 
 
