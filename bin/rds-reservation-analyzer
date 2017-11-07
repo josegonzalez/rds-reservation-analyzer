@@ -399,7 +399,6 @@ def main(check='disk',
                 if tag['Key'] == tag_key and tag['Value'] == tag_value:
                     rds_instances.append(rds_instance)
 
-    tables = {}
     if reservation_type == 'all':
         reservation_types = [
             '1yr-no-upfront',
@@ -411,6 +410,7 @@ def main(check='disk',
     else:
         reservation_types = [reservation_type]
 
+    tables = collections.OrderedDict()
     fields = fields.split(',')
     for reservation_type in reservation_types:
         tables[reservation_type] = compute_table(
