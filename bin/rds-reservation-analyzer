@@ -187,7 +187,9 @@ def check_cpu(rds_instance,
                                        'CPUUtilization',
                                        'Percent',
                                        days_to_check)
-    avg = float(sum(datapoints)) / len(datapoints)
+    avg = 0
+    if len(datapoints) != 0:
+        avg = float(sum(datapoints)) / len(datapoints)
 
     datapoints.append(100)
     reserve = False
@@ -220,7 +222,9 @@ def check_disk(rds_instance,
                                        'Bytes',
                                        days_to_check)
     datapoints = [100 - (bitmath.Byte(d) / total_disk) * 100 for d in datapoints]  # noqa
-    avg = float(sum(datapoints)) / len(datapoints)
+    avg = 0
+    if len(datapoints) != 0:
+        avg = float(sum(datapoints)) / len(datapoints)
 
     datapoints.append(100)
     reserve = False
@@ -253,7 +257,9 @@ def check_memory(rds_instance,
                                        'Bytes',
                                        days_to_check)
     datapoints = [100 - (bitmath.Byte(d) / total_memory) * 100 for d in datapoints]  # noqa
-    avg = float(sum(datapoints)) / len(datapoints)
+    avg = 0
+    if len(datapoints) != 0:
+        avg = float(sum(datapoints)) / len(datapoints)
 
     datapoints.append(100)
     reserve = False
