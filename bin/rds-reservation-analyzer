@@ -183,7 +183,6 @@ def check_cpu(rds_instance,
               threshold=25,
               days_to_check=90):
     name = rds_instance['DBInstanceIdentifier']
-    client = boto3.client('cloudwatch')
     datapoints = get_metric_datapoints(name,
                                        'CPUUtilization',
                                        'Percent',
@@ -216,7 +215,6 @@ def check_disk(rds_instance,
                days_to_check=90):
     name = rds_instance['DBInstanceIdentifier']
     total_disk = bitmath.GiB(float(rds_instance['AllocatedStorage']))
-    client = boto3.client('cloudwatch')
     datapoints = get_metric_datapoints(name,
                                        'FreeStorageSpace',
                                        'Bytes',
@@ -250,7 +248,6 @@ def check_memory(rds_instance,
                  days_to_check=90):
     name = rds_instance['DBInstanceIdentifier']
     total_memory = bitmath.GiB(float(rds_instance['meta']['memory']))
-    client = boto3.client('cloudwatch')
     datapoints = get_metric_datapoints(name,
                                        'FreeableMemory',
                                        'Bytes',
