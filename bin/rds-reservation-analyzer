@@ -161,22 +161,24 @@ def get_associated_offer(instance_identifier,
 def calculate_offerings(offer_terms):
     hours_per_year = 8760
     offerings = {}
+    upfronts = {}
     for sku, offer_term in offer_terms.items():
         length = offer_term['termAttributes']['LeaseContractLength']
         description = offer_term['termAttributes']['PurchaseOption']
-        description = '{0}-{1}'.format(length, description)
+        description = '{0}-{1}'.format(length, description).lower().replace(' ', '-')
         per_year_costs = 0.00
         for pd_sku, price_dimension in offer_term['priceDimensions'].items():
             price = price_dimension['pricePerUnit']['USD']
             if price_dimension['description'] == 'Upfront Fee':
                 if length == '3yr':
+                    upfronts[description] = float(price)
                     per_year_costs += float(price) / 3
                 else:
                     per_year_costs += float(price)
             else:
                 per_year_costs += float(price) * hours_per_year
-        offerings[description.lower().replace(' ', '-')] = per_year_costs
-    return offerings
+        offerings[description] = per_year_costs
+    return offerings, upfronts
 
 
 def check_cpu(rds_instance,
@@ -197,7 +199,7 @@ def check_cpu(rds_instance,
     if avg < threshold:
         reserve = True
 
-    offerings = calculate_offerings(rds_instance['offer_terms'])
+    offerings, upfronts = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
     savings = offerings['1yr-no-upfront'] - cost
 
@@ -205,6 +207,7 @@ def check_cpu(rds_instance,
         ('id', name),
         ('type', rds_instance['DBInstanceClass']),
         ('cost', cost),
+        ('upfront', upfronts.get(reservation_type, 0.00)),
         ('savings', float(format(round(savings, 2), '.2f'))),
         ('resource_usage', avg),
         ('reserve', reserve),
@@ -232,7 +235,7 @@ def check_disk(rds_instance,
     if avg < threshold:
         reserve = True
 
-    offerings = calculate_offerings(rds_instance['offer_terms'])
+    offerings, upfronts = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
     savings = offerings['1yr-no-upfront'] - cost
 
@@ -240,6 +243,7 @@ def check_disk(rds_instance,
         ('id', name),
         ('type', rds_instance['DBInstanceClass']),
         ('cost', cost),
+        ('upfront', upfronts.get(reservation_type, 0.00)),
         ('savings', float(format(round(savings, 2), '.2f'))),
         ('resource_usage', avg),
         ('reserve', reserve),
@@ -267,7 +271,7 @@ def check_memory(rds_instance,
     if avg < threshold:
         reserve = True
 
-    offerings = calculate_offerings(rds_instance['offer_terms'])
+    offerings, upfronts = calculate_offerings(rds_instance['offer_terms'])
     cost = offerings[reservation_type]
     savings = offerings['1yr-no-upfront'] - cost
 
@@ -275,6 +279,7 @@ def check_memory(rds_instance,
         ('id', name),
         ('type', rds_instance['DBInstanceClass']),
         ('cost', cost),
+        ('upfront', upfronts.get(reservation_type, 0.00)),
         ('savings', float(format(round(savings, 2), '.2f'))),
         ('resource_usage', avg),
         ('reserve', reserve),
@@ -359,12 +364,12 @@ def compute_table(rds_instances,
 @argh.arg('-F', '--format', choices=['stdout', 'xls'])
 @argh.arg('-K', '--tag-key')
 @argh.arg('-R', '--reservation-type', choices=['1yr-no-upfront', '1yr-partial-upfront', '1yr-all-upfront', '3yr-partial-upfront', '3yr-all-upfront', 'all'])  # noqa
-@argh.arg('-S', '--sort-by', choices=['id', 'type', 'cost', 'savings', 'resource_usage', 'reserve'])  # noqa
+@argh.arg('-S', '--sort-by', choices=['id', 'type', 'cost', 'upfront', 'savings', 'resource_usage', 'reserve'])  # noqa
 @argh.arg('-T', '--threshold')
 @argh.arg('-V', '--tag-value')
 def main(check='disk',
          days_to_check=90,
-         fields='id,type,cost,savings,resource_usage,reserve,sparklines',
+         fields='id,type,cost,upfront,savings,resource_usage,reserve,sparklines',
          format='stdout',
          reservation_type='1yr-no-upfront',
          sort_by='id',
