@@ -170,8 +170,8 @@ def calculate_offerings(offer_terms):
         for pd_sku, price_dimension in offer_term['priceDimensions'].items():
             price = price_dimension['pricePerUnit']['USD']
             if price_dimension['description'] == 'Upfront Fee':
+                upfronts[description] = float(price)
                 if length == '3yr':
-                    upfronts[description] = float(price)
                     per_year_costs += float(price) / 3
                 else:
                     per_year_costs += float(price)
@@ -431,6 +431,7 @@ def main(check='disk',
       ('id', 'instance identifier'),
       ('type', 'instance type'),
       ('cost', 'cost'),
+      ('upfront', 'upfront'),
       ('savings', 'savings'),
       ('resource_usage', 'resource usage %'),
       ('reserve', 'reserve'),
